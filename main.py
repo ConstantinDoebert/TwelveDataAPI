@@ -15,9 +15,9 @@ free_rate = 0.0375
 implied_vol = 0.5
 maturity_date = "2024-08-05"
 
-def days_between(): # expects (future) date in YYYY-MM-DD format
+def days_between():
     date1 = datetime.strptime(datetime.today().strftime('%Y-%m-%d'), "%Y-%m-%d")
-    maturity_date = datetime.strptime(maturity_date, "%Y-%m-%d")
+    maturity_date = datetime.strptime("2024-08-05", "%Y-%m-%d")
     return abs((maturity_date - date1).days)
 
 def prob_of_z(z):
