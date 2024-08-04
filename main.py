@@ -3,13 +3,16 @@ import pandas as pd
 from datetime import datetime
 import numpy as np
 from scipy.stats import norm
-"""
-td = TDClient(apikey="")
+import requests as rq
 
-df = td.time_series(symbol="AAPL", interval="1day", start_date="2018-01-01", end_date="2024-07-01").as_pandas()
-"""
+key = "eba7da3b24104ca594f061cb762cb8da"
+# td = TDClient(apikey=key)
 
-price = 107
+# df = td.time_series(symbol="AAPL", interval="1day", start_date="2018-01-01", end_date="2024-07-01").as_pandas()
+
+ticker = "NVDA"
+price = rq.get(f"https://api.twelvedata.com/price?symbol={ticker}&apikey={key}")
+price = float(price.json()["price"])
 strike = 130
 free_rate = 0.0375
 implied_vol = 0.5
@@ -35,4 +38,4 @@ def call():
 def put():
     return -price*prob_of_z(d1()) + strike * np.exp(-free_rate*days_between()) * prob_of_z(d2())
 
-print(call())
+# print(call())
