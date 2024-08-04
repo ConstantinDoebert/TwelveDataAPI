@@ -4,6 +4,7 @@ from scipy.stats import norm
 import numpy as np
 import requests as rq
 import pandas as pd
+import json
 
 key = "eba7da3b24104ca594f061cb762cb8da"
 
@@ -16,17 +17,23 @@ def get_price(ticker: str):
 
 td = TDClient(apikey=key)
 
-def get_time_series(ticker: str, num_intervals = 10):
-    earnings_dates = rq.get(f"https://api.twelvedata.com/earnings?symbol={ticker}&apikey={key}&outputsize={num_intervals}").json()["earnings"]
-    """for interval in range(num_intervals):
-        df = td.time_series(symbol=ticker, 
-                            interval="1day", 
-                            start_date="2018-01-01", 
-                            end_date="2024-07-01"
-                            ).as_pandas()"""
-    return earnings_dates
+def get_time_series(ticker: str, num_intervals=3):
+    earnings_dates = rq.get(f"https://api.twelvedata.com/earnings?symbol={ticker}&apikey={key}&outputsize=20").json()
+    dates = []
+    today = datetime.today().date()
+    for item in earnings_dates["earnings"]:
+        earnings_date = datetime.strptime(item['date'], "%Y-%m-%d").date()
 
-print(get_time_series("AAPL"))
+        if earnings_date <= today:
+            dates.append(item['date'])
+
+    dates = dates[:3]
+
+    return dates
+
+print(get_time_series("NVDA"))
+
+
 
 strike = 130
 free_rate = 0.0375
@@ -34,7 +41,7 @@ implied_vol = 0.5
 maturity_date = "2024-08-05"
 
 def days_between(maturity_date):
-    date1 = datetime.strptime(datetime.today().strftime('%Y-%m-%d'), "%Y-%m-%d")
+    date1 = datetime.today()
     maturity_date = datetime.strptime(maturity_date, "%Y-%m-%d")
     return abs((maturity_date - date1).days)
 
