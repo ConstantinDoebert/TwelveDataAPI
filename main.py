@@ -6,7 +6,7 @@ import requests as rq
 import pandas as pd
 import json
 
-key = "eba7da3b24104ca594f061cb762cb8da"
+key = ""
 
 def get_price(ticker: str):
     price = rq.get(f"https://api.twelvedata.com/price?symbol={ticker}&apikey={key}")
