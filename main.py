@@ -36,9 +36,9 @@ def get_earnings_dates(ticker: str, num_intervals=3):
 def get_time_series(ticker: str):
     dates = get_earnings_dates(ticker)
     start_dates = []
-    start_dates = [date - timedelta(days=28) for date in dates]
+    start_dates = [date - timedelta(days=41) for date in dates]
 
-    all_closing_prices = {}
+    all_closing_prices = []
     
     for i in range(len(dates)):
         start_date = start_dates[i]
@@ -56,21 +56,41 @@ def get_time_series(ticker: str):
         )
         
         time_series = response.json()
-        print(time_series)
+
 
         if "values" in time_series:
-            closing_prices = {value["datetime"]: float(value["close"]) for value in time_series["values"]}
-            all_closing_prices[f'{start_date} to {end_date}'] = closing_prices
+            closing_prices = [float(value["close"]) for value in time_series["values"]]
+            all_closing_prices.append(closing_prices)
+    
 
-    # Convert to DataFrame, aligning data by date
-    df = pd.DataFrame(all_closing_prices)
-    df = df.reset_index(drop=True)
+    max_length = max(len(prices) for prices in all_closing_prices)
 
+    padded_closing_prices = [prices + [float('nan')] * (max_length - len(prices)) for prices in all_closing_prices]
+
+    df = pd.DataFrame(padded_closing_prices).T
+    df.columns = [f'Interval {i+1}' for i in range(len(dates))]
+
+    df = df.iloc[::-1].reset_index(drop=True)
     
     return df
 
-print(get_time_series("NVDA"))
-# print(rq.get(f"https://api.twelvedata.com/time_series?symbol=NVDA&interval=1day&apikey={key}&startdate=2024-07-02&enddate=2024-08-02").json())
+
+def analyze_returns(ticker: str):
+    df = get_time_series(ticker)
+    means = []
+    standard_devs = []
+    avg_return = []
+    for column in df:
+        mean =  sum(df[column].dropna().tolist()) / len(df)
+        means.append(mean)
+        deviation = [value - means[df.columns.get_loc(column)] for value in df[column].dropna()]
+        summe = sum(deviation)
+        standard_devs.append(summe / (len(df) - 1))  # Bessel's correction
+    
+
+    return means, standard_devs
+
+print(analyze_returns("NVDA"))
 
 
 strike = 130
