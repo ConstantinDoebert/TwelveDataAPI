@@ -1,23 +1,24 @@
-from twelvedata import TDClient
-from datetime import datetime
+from datetime import datetime, timedelta
 from scipy.stats import norm
 import numpy as np
 import requests as rq
 import pandas as pd
-import json
+
 
 key = ""
 
+
+price_cache = {}
+
 def get_price(ticker: str):
-    price = rq.get(f"https://api.twelvedata.com/price?symbol={ticker}&apikey={key}")
-    price = float(price.json()["price"])
-    return price
+    if 'price' not in price_cache:
+        price = rq.get(f"https://api.twelvedata.com/price?symbol={ticker}&apikey={key}")
+        price = float(price.json()["price"])
+        price_cache['price'] = price
+    return price_cache
 
-# price = get_price("NVDA")
 
-td = TDClient(apikey=key)
-
-def get_time_series(ticker: str, num_intervals=3):
+def get_earnings_dates(ticker: str, num_intervals=3):
     earnings_dates = rq.get(f"https://api.twelvedata.com/earnings?symbol={ticker}&apikey={key}&outputsize=20").json()
     dates = []
     today = datetime.today().date()
@@ -25,20 +26,58 @@ def get_time_series(ticker: str, num_intervals=3):
         earnings_date = datetime.strptime(item['date'], "%Y-%m-%d").date()
 
         if earnings_date <= today:
-            dates.append(item['date'])
+            dates.append(datetime.strptime(item['date'], "%Y-%m-%d").date())
 
-    dates = dates[:3]
+    dates = dates[:num_intervals]
 
     return dates
 
-print(get_time_series("NVDA"))
 
+def get_time_series(ticker: str):
+    dates = get_earnings_dates(ticker)
+    start_dates = []
+    start_dates = [date - timedelta(days=28) for date in dates]
+
+    all_closing_prices = {}
+    
+    for i in range(len(dates)):
+        start_date = start_dates[i]
+        end_date = dates[i]
+        
+        response = rq.get(
+            f"https://api.twelvedata.com/time_series",
+            params={
+                "symbol": ticker,
+                "interval": "1day",
+                "apikey": key,
+                "start_date": start_date.strftime("%Y-%m-%d"),
+                "end_date": end_date.strftime("%Y-%m-%d"),
+            }
+        )
+        
+        time_series = response.json()
+        print(time_series)
+
+        if "values" in time_series:
+            closing_prices = {value["datetime"]: float(value["close"]) for value in time_series["values"]}
+            all_closing_prices[f'{start_date} to {end_date}'] = closing_prices
+
+    # Convert to DataFrame, aligning data by date
+    df = pd.DataFrame(all_closing_prices)
+    df = df.reset_index(drop=True)
+
+    
+    return df
+
+print(get_time_series("NVDA"))
+# print(rq.get(f"https://api.twelvedata.com/time_series?symbol=NVDA&interval=1day&apikey={key}&startdate=2024-07-02&enddate=2024-08-02").json())
 
 
 strike = 130
 free_rate = 0.0375
 implied_vol = 0.5
 maturity_date = "2024-08-05"
+
 
 def days_between(maturity_date):
     date1 = datetime.today()
@@ -49,16 +88,16 @@ def prob_of_z(z):
     return norm.cdf(z)
 
 def d1():
-    return (np.log(price / strike) + (free_rate + implied_vol**2 / 2) * (days_between(maturity_date)))
+    return (np.log(price_cache["price"] / strike) + (free_rate + implied_vol**2 / 2) * (days_between(maturity_date)))
 
 def d2():
     return d1() - implied_vol * days_between(maturity_date)
 
 def call():
-    return [price*prob_of_z(d1()) - strike * np.exp(-free_rate*days_between(maturity_date)) * prob_of_z(d2())]
+    return [price_cache["price"]*prob_of_z(d1()) - strike * np.exp(-free_rate*days_between(maturity_date)) * prob_of_z(d2())]
 
 def put():
-    return [-price*prob_of_z(d1()) + strike * np.exp(-free_rate*days_between(maturity_date)) * prob_of_z(d2())]
+    return [-price_cache["price"]*prob_of_z(d1()) + strike * np.exp(-free_rate*days_between(maturity_date)) * prob_of_z(d2())]
 
 
 def simulate_stock_prices(initial_prices, expected_returns, volatilities, correlations, time_horizon):
