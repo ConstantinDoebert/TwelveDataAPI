@@ -1,11 +1,11 @@
 from datetime import datetime, timedelta
-from scipy.stats import norm
+from scipy.stats import norm, ttest_1samp, t
 import numpy as np
 import requests as rq
 import pandas as pd
 
 
-key = ""
+key = "eba7da3b24104ca594f061cb762cb8da"
 
 
 price_cache = {}
@@ -13,8 +13,7 @@ price_cache = {}
 def get_price(ticker: str):
     if 'price' not in price_cache:
         price = rq.get(f"https://api.twelvedata.com/price?symbol={ticker}&apikey={key}")
-        price = float(price.json()["price"])
-        price_cache['price'] = price
+        price_cache['price'] = float(price.json()["price"])
     return price_cache
 
 
@@ -77,20 +76,42 @@ def get_time_series(ticker: str):
 
 def analyze_returns(ticker: str):
     df = get_time_series(ticker)
-    means = []
-    standard_devs = []
-    avg_return = []
+    means, standard_devs, avg_return, sample_size = ([], [], [], [])
+
     for column in df:
-        mean =  sum(df[column].dropna().tolist()) / len(df)
-        means.append(mean)
-        deviation = [value - means[df.columns.get_loc(column)] for value in df[column].dropna()]
-        summe = sum(deviation)
-        standard_devs.append(summe / (len(df) - 1))  # Bessel's correction
+        means.append(df[column].dropna().mean())
+        standard_devs.append(np.sqrt(df[column].dropna().var())) # Bessel's correction 
+        avg_return.append((df[column].dropna().iloc[-1] - df[column].dropna().iloc[0]) / df[column].dropna().iloc[0])
+        sample_size.append(df[column].dropna().count())
     
+    return means, standard_devs, avg_return, sample_size
 
-    return means, standard_devs
+def one_sample_t_test(ticker: str, alpha=0.1):
+    """
+    Tests if total return over period is significantly deviation from 0. One sided test.
+    Level of signficance is set to 0.05 for standard.
+    """
+    values = analyze_returns(ticker)
+    standard_devs = values[1]
+    avg_return = values[2]
+    sample_size = values[3]
+    is_significant = []
 
-print(analyze_returns("NVDA"))
+    for sample in range(len(avg_return)):
+        print(avg_return[sample], standard_devs[sample], sample_size[sample])
+        if avg_return[sample] / standard_devs[sample] * np.sqrt(sample_size[sample]) < -t.cdf(1-alpha, df=sample_size[sample]):
+            is_significant.append(True)
+        else:
+            is_significant.append(False)
+    # for column in df:
+    #     if ttest_1samp(df[column], popmean=0, alternative="greater", nan_policy="omit")[1] < alpha:
+    #         is_significant.append(True)
+    #     else:
+    #         is_significant.append(False)
+        
+    return is_significant
+
+print(one_sample_t_test("NVDA"))
 
 
 strike = 130
@@ -100,7 +121,7 @@ maturity_date = "2024-08-05"
 
 
 def days_between(maturity_date):
-    date1 = datetime.today()
+    date1 = datetime.today().date()
     maturity_date = datetime.strptime(maturity_date, "%Y-%m-%d")
     return abs((maturity_date - date1).days)
 
