@@ -86,33 +86,24 @@ def analyze_returns(ticker: str):
     
     return means, standard_devs, avg_return, sample_size
 
-def one_sample_t_test(ticker: str, alpha=0.1):
+def one_sample_t_test(ticker: str, alpha=0.05):
     """
-    Tests if total return over period is significantly deviation from 0. One sided test.
-    Level of signficance is set to 0.05 for standard.
+    Tests if total return over period deviates from 0 positively; one sided test.
+    Level of signficance is set to 0.05.
     """
     values = analyze_returns(ticker)
-    standard_devs = values[1]
     avg_return = values[2]
-    sample_size = values[3]
     is_significant = []
 
     for sample in range(len(avg_return)):
-        print(avg_return[sample], standard_devs[sample], sample_size[sample])
-        if avg_return[sample] / standard_devs[sample] * np.sqrt(sample_size[sample]) < -t.cdf(1-alpha, df=sample_size[sample]):
+        if  ttest_1samp(avg_return, popmean=0, nan_policy="omit", alternative="greater")[0] > t.cdf(1-alpha, df=len(avg_return)-1):
             is_significant.append(True)
         else:
             is_significant.append(False)
-    # for column in df:
-    #     if ttest_1samp(df[column], popmean=0, alternative="greater", nan_policy="omit")[1] < alpha:
-    #         is_significant.append(True)
-    #     else:
-    #         is_significant.append(False)
         
     return is_significant
 
 print(one_sample_t_test("NVDA"))
-
 
 strike = 130
 free_rate = 0.0375
