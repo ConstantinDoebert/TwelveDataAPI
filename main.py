@@ -5,7 +5,7 @@ import requests as rq
 import pandas as pd
 
 
-key = "eba7da3b24104ca594f061cb762cb8da"
+key = ""
 
 
 price_cache = {}
